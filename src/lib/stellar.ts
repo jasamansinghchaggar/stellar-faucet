@@ -7,7 +7,7 @@ import {
   Operation,
   StrKey,
   TransactionBuilder,
-} from "stellar-sdk";
+} from "@stellar/stellar-sdk";
 
 const horizonUrl =
   process.env.STELLAR_HORIZON_URL ?? "https://horizon-testnet.stellar.org";

@@ -6,7 +6,7 @@
 
 - [ ] Create a next app in the current directory
 - [ ] Install dependencies:
-  - stellar-sdk
+  - @stellar/stellar-sdk
   - tailwindcss
   - mongoose
 - [ ] Install and Setup shadcn (for UI components)
@@ -17,7 +17,7 @@
 
 - [ ] Run keypair generation command:
   ```bash
-  node -e "const {Keypair}=require('stellar-sdk');const kp=Keypair.random();console.log('Public:',kp.publicKey(),'\nSecret:',kp.secret())"
+  node -e "const {Keypair}=require('@stellar/stellar-sdk');const kp=Keypair.random();console.log('Public:',kp.publicKey(),'\nSecret:',kp.secret())"
   ```
 - [ ] Save public key and secret key to a secure location (LastPass/1Password or safe file)
 - [ ] Document in a private notes file (never commit)

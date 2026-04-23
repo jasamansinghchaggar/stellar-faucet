@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type FormEvent, useEffect, useState } from "react";
+import { type CSSProperties, type SubmitEvent, useEffect, useState } from "react";
 
 type FaucetStatus = {
   operational: boolean;
@@ -156,7 +156,7 @@ export default function Home() {
     };
   }, []);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setResult(null);
