@@ -132,17 +132,16 @@ export default function Home() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,oklch(0.97_0_0),transparent_60%)]" />
-      <main className="relative mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
-        <Card className="w-full border-border/70 bg-card/95 shadow-xl backdrop-blur">
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+        <Card className="w-full border-border bg-card shadow-sm">
           <CardHeader className="gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-2">
                 <Badge variant="outline" className="w-fit">
                   Stellar Testnet
                 </Badge>
-                <CardTitle className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                <CardTitle className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
                   Faucet
                 </CardTitle>
                 <CardDescription className="text-sm sm:text-base">
@@ -161,15 +160,15 @@ export default function Home() {
           <Separator />
 
           <CardContent className="space-y-4">
-            <Card size="sm" className="border-border/70 bg-muted/30 shadow-none">
+            <Card size="sm" className="border-border bg-muted/40 shadow-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <CardTitle className="font-heading flex items-center gap-2 text-sm font-medium">
                   <ShieldCheck className="size-4" />
                   Faucet status
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="rounded-lg border border-border/70 bg-background/70 p-3">
+                <div className="rounded-lg border border-border bg-background p-3">
                   <p className="text-xs text-muted-foreground">Current status</p>
                   <p className="mt-1 text-sm font-medium">
                     {statusLoading ? "Loading..." : status?.operational ? "Operational" : "Unavailable"}
@@ -181,9 +180,9 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card size="sm" className="border-border/70 bg-muted/30 shadow-none">
+            <Card size="sm" className="border-border bg-muted/40 shadow-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <CardTitle className="font-heading flex items-center gap-2 text-sm font-medium">
                   <Droplets className="size-4" />
                   Request XLM
                 </CardTitle>
@@ -226,9 +225,9 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card size="sm" className="border-border/70 bg-muted/30 shadow-none">
+            <Card size="sm" className="border-border bg-muted/40 shadow-none">
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Result</CardTitle>
+                <CardTitle className="font-heading text-sm font-medium">Result</CardTitle>
               </CardHeader>
               <CardContent>
                 {!result ? (
@@ -251,7 +250,7 @@ export default function Home() {
                     </AlertTitle>
                     <AlertDescription>{result.message}</AlertDescription>
                     {result.hash ? (
-                      <div className="mt-2 rounded-md border border-border/70 bg-background/70 p-2 font-mono text-xs break-all">
+                      <div className="mt-2 rounded-md border border-border bg-background p-2 font-mono text-xs break-all">
                         {result.hash}
                       </div>
                     ) : null}
