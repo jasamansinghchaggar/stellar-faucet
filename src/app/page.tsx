@@ -1,6 +1,29 @@
 "use client";
 
-import { type CSSProperties, type SubmitEvent, useEffect, useState } from "react";
+import { type SubmitEvent, useEffect, useState } from "react";
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  Droplets,
+  Loader2,
+  SendHorizontal,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 type FaucetStatus = {
   operational: boolean;
@@ -15,110 +38,6 @@ type RequestResult = {
   hash?: string;
 };
 
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-    background:
-      "linear-gradient(135deg, rgba(44, 83, 100, 1) 0%, rgba(32, 58, 67, 1) 50%, rgba(15, 32, 39, 1) 100%)",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "640px",
-    borderRadius: "18px",
-    padding: "24px",
-    background: "#ffffff",
-    boxShadow: "0 20px 50px rgba(0, 0, 0, 0.2)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  heading: {
-    margin: 0,
-    fontSize: "28px",
-    fontWeight: 700,
-    color: "#111827",
-  },
-  subheading: {
-    margin: 0,
-    color: "#4b5563",
-    fontSize: "15px",
-  },
-  section: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "12px",
-    padding: "14px",
-    backgroundColor: "#f9fafb",
-  },
-  sectionTitle: {
-    margin: "0 0 10px",
-    fontSize: "15px",
-    fontWeight: 600,
-    color: "#111827",
-  },
-  statusRow: {
-    margin: "4px 0",
-    color: "#374151",
-    fontSize: "14px",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "120px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    padding: "12px",
-    fontSize: "14px",
-    resize: "vertical",
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-  },
-  button: {
-    marginTop: "12px",
-    width: "100%",
-    borderRadius: "10px",
-    border: "none",
-    backgroundColor: "#2563eb",
-    color: "#ffffff",
-    padding: "12px 16px",
-    fontSize: "14px",
-    fontWeight: 600,
-    cursor: "pointer",
-    opacity: 1,
-  },
-  buttonDisabled: {
-    cursor: "not-allowed",
-    opacity: 0.6,
-  },
-  successText: {
-    color: "#166534",
-    margin: "0 0 8px",
-  },
-  errorText: {
-    color: "#991b1b",
-    margin: "0 0 8px",
-  },
-  hashText: {
-    margin: 0,
-    wordBreak: "break-all",
-    color: "#1f2937",
-    fontSize: "13px",
-  },
-  footer: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "12px",
-    fontSize: "13px",
-    color: "#6b7280",
-  },
-  link: {
-    color: "#1d4ed8",
-    textDecoration: "none",
-  },
-};
-
 async function fetchStatus(): Promise<FaucetStatus> {
   const response = await fetch("/api/status", { cache: "no-store" });
   return (await response.json()) as FaucetStatus;
@@ -127,6 +46,7 @@ async function fetchStatus(): Promise<FaucetStatus> {
 export default function Home() {
   const [publicKey, setPublicKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [result, setResult] = useState<RequestResult | null>(null);
   const [status, setStatus] = useState<FaucetStatus | null>(null);
 
@@ -147,6 +67,10 @@ export default function Home() {
             amount: "100",
             error: "Unable to fetch faucet status.",
           });
+        }
+      } finally {
+        if (active) {
+          setStatusLoading(false);
         }
       }
     })();
@@ -208,94 +132,182 @@ export default function Home() {
   }
 
   return (
-    <div style={styles.page}>
-      <main style={styles.card}>
-        <header>
-          <h1 style={styles.heading}>Stellar Testnet Faucet</h1>
-          <p style={styles.subheading}>
-            Request test XLM for development on Stellar testnet.
-          </p>
-        </header>
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,oklch(0.97_0_0),transparent_60%)]" />
+      <main className="relative mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+        <Card className="w-full border-border/70 bg-card/95 shadow-xl backdrop-blur">
+          <CardHeader className="gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-2">
+                <Badge variant="outline" className="w-fit">
+                  Stellar Testnet
+                </Badge>
+                <CardTitle className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Faucet
+                </CardTitle>
+                <CardDescription className="text-sm sm:text-base">
+                  Request test XLM in one click for development and integration testing.
+                </CardDescription>
+              </div>
+              <Badge
+                variant={status?.operational ? "default" : "destructive"}
+                className="h-6 px-2.5"
+              >
+                {status?.operational ? "Operational" : "Unavailable"}
+              </Badge>
+            </div>
+          </CardHeader>
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Faucet Status</h2>
-          <p style={styles.statusRow}>
-            Operational:{" "}
-            <strong>{status?.operational ? "Yes" : "No"}</strong>
-          </p>
-          <p style={styles.statusRow}>
-            Faucet Balance: <strong>{status?.balance ?? "Unavailable"} XLM</strong>
-          </p>
-          <p style={styles.statusRow}>
-            Amount per Request:{" "}
-            <strong>{status?.amount ?? process.env.NEXT_PUBLIC_FAUCET_AMOUNT_XLM ?? "100"} XLM</strong>
-          </p>
-          {status?.error ? <p style={styles.errorText}>{status.error}</p> : null}
-        </section>
+          <Separator />
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Request XLM</h2>
-          <form onSubmit={onSubmit}>
-            <textarea
-              value={publicKey}
-              onChange={(event) => setPublicKey(event.target.value)}
-              placeholder="Paste your Stellar public key (G...)"
-              style={styles.textarea}
-              required
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                ...styles.button,
-                ...(loading ? styles.buttonDisabled : {}),
-              }}
-            >
-              {loading ? "Sending..." : "Request Test XLM"}
-            </button>
-          </form>
-        </section>
+          <CardContent className="space-y-4">
+            <Card size="sm" className="border-border/70 bg-muted/30 shadow-none">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                  <ShieldCheck className="size-4" />
+                  Faucet status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-border/70 bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Current status</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {statusLoading ? "Loading..." : status?.operational ? "Operational" : "Unavailable"}
+                  </p>
+                  {status?.error ? (
+                    <p className="mt-2 text-xs text-muted-foreground">{status.error}</p>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Result</h2>
-          {!result ? (
-            <p style={styles.statusRow}>No request submitted yet.</p>
-          ) : (
-            <>
-              <p style={result.type === "success" ? styles.successText : styles.errorText}>
-                {result.message}
-              </p>
-              {result.hash ? <p style={styles.hashText}>Transaction Hash: {result.hash}</p> : null}
-            </>
-          )}
-        </section>
+            <Card size="sm" className="border-border/70 bg-muted/30 shadow-none">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                  <Droplets className="size-4" />
+                  Request XLM
+                </CardTitle>
+                <CardDescription>
+                  Paste a Stellar public key (56 chars, starts with G).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={onSubmit} className="space-y-3">
+                  <Textarea
+                    value={publicKey}
+                    onChange={(event) => setPublicKey(event.target.value)}
+                    placeholder="G..."
+                    className="min-h-28 bg-background font-mono text-xs sm:text-sm"
+                    required
+                  />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{publicKey.trim().length}/56</span>
+                    <span>Stellar public key</span>
+                  </div>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full"
+                    disabled={loading || !publicKey.trim()}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Sending request...
+                      </>
+                    ) : (
+                      <>
+                        <SendHorizontal className="size-4" />
+                        Request test XLM
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
 
-        <footer style={styles.footer}>
-          <a
-            href="https://developers.stellar.org/docs"
-            target="_blank"
-            rel="noreferrer"
-            style={styles.link}
-          >
-            Stellar Docs
-          </a>
-          <a
-            href="https://stellar.expert/explorer/testnet"
-            target="_blank"
-            rel="noreferrer"
-            style={styles.link}
-          >
-            Testnet Explorer
-          </a>
-          <a
-            href="https://horizon-testnet.stellar.org"
-            target="_blank"
-            rel="noreferrer"
-            style={styles.link}
-          >
-            Horizon API
-          </a>
-        </footer>
+            <Card size="sm" className="border-border/70 bg-muted/30 shadow-none">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Result</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!result ? (
+                  <Alert>
+                    <TriangleAlert className="size-4" />
+                    <AlertTitle>No request yet</AlertTitle>
+                    <AlertDescription>
+                      Submit a valid Stellar public key to receive testnet XLM.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert variant={result.type === "success" ? "default" : "destructive"}>
+                    {result.type === "success" ? (
+                      <CheckCircle2 className="size-4" />
+                    ) : (
+                      <TriangleAlert className="size-4" />
+                    )}
+                    <AlertTitle>
+                      {result.type === "success" ? "Request successful" : "Request failed"}
+                    </AlertTitle>
+                    <AlertDescription>{result.message}</AlertDescription>
+                    {result.hash ? (
+                      <div className="mt-2 rounded-md border border-border/70 bg-background/70 p-2 font-mono text-xs break-all">
+                        {result.hash}
+                      </div>
+                    ) : null}
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </CardContent>
+
+          <CardFooter className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <p className="text-xs text-muted-foreground">
+              Built for fast Stellar testnet development.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                render={
+                  <a
+                    href="https://developers.stellar.org/docs"
+                    target="_blank"
+                    rel="noreferrer"
+                  />
+                }
+                className="h-6 gap-1"
+              >
+                Docs <ArrowUpRight className="size-3" />
+              </Badge>
+              <Badge
+                variant="outline"
+                render={
+                  <a
+                    href="https://stellar.expert/explorer/testnet"
+                    target="_blank"
+                    rel="noreferrer"
+                  />
+                }
+                className="h-6 gap-1"
+              >
+                Explorer <ArrowUpRight className="size-3" />
+              </Badge>
+              <Badge
+                variant="outline"
+                render={
+                  <a
+                    href="https://horizon-testnet.stellar.org"
+                    target="_blank"
+                    rel="noreferrer"
+                  />
+                }
+                className="h-6 gap-1"
+              >
+                Horizon <ArrowUpRight className="size-3" />
+              </Badge>
+            </div>
+          </CardFooter>
+        </Card>
       </main>
     </div>
   );
