@@ -5,7 +5,7 @@ Built with Next.js App Router, shadcn/ui, Stellar SDK, and MongoDB-backed rate l
 
 ## Features
 
-- Request test XLM by submitting a Stellar public key.
+- Request test XLM by connecting Freighter and submitting your wallet public key.
 - Public key validation and clear API error responses.
 - Per-wallet rate limiting (`RATE_LIMIT_HOURS`) stored in MongoDB.
 - Faucet health endpoint for status checks.
@@ -16,6 +16,7 @@ Built with Next.js App Router, shadcn/ui, Stellar SDK, and MongoDB-backed rate l
 - Next.js 16 + React 19 + TypeScript
 - shadcn/ui + Tailwind CSS v4
 - `@stellar/stellar-sdk`
+- `@stellar/freighter-api`
 - MongoDB + Mongoose
 
 ## Setup
@@ -37,9 +38,11 @@ FAUCET_AMOUNT_XLM=100
 RATE_LIMIT_HOURS=24
 ```
 
-3. Start MongoDB locally.
+3. Install the Freighter browser extension and create/import a wallet.
 
-4. Run the app:
+4. Start MongoDB locally.
+
+5. Run the app:
 
 ```bash
 npm run dev

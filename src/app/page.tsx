@@ -9,6 +9,7 @@ import {
   SendHorizontal,
   ShieldCheck,
   TriangleAlert,
+  Wallet,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -24,6 +25,10 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  connectFreighterWallet,
+  getFreighterAddressIfAllowed,
+} from "@/lib/freighter";
 import {
   REQUEST_XLM_USER_MESSAGES,
   isRequestXlmErrorCode,
@@ -85,9 +90,12 @@ function getUserFacingRequestMessage(
 export default function Home() {
   const [publicKey, setPublicKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [result, setResult] = useState<RequestResult | null>(null);
   const [status, setStatus] = useState<FaucetStatus | null>(null);
+  const walletConnected = Boolean(publicKey.trim());
 
   useEffect(() => {
     let active = true;
@@ -118,6 +126,41 @@ export default function Home() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      const walletAddress = await getFreighterAddressIfAllowed();
+      if (active && walletAddress) {
+        setPublicKey(walletAddress);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function onConnectWallet() {
+    setWalletLoading(true);
+    setWalletError(null);
+
+    const walletResult = await connectFreighterWallet();
+    if (!walletResult.success) {
+      setWalletError(walletResult.message);
+      setWalletLoading(false);
+      return;
+    }
+
+    setPublicKey(walletResult.address);
+    setWalletLoading(false);
+  }
+
+  function onDisconnectWallet() {
+    setPublicKey("");
+    setWalletError(null);
+  }
 
   async function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -230,15 +273,54 @@ export default function Home() {
                   Request XLM
                 </CardTitle>
                 <CardDescription>
-                  Paste a Stellar public key (56 chars, starts with G).
+                  Connect Freighter to auto-fill your Stellar public key.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={onSubmit} className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onConnectWallet}
+                      disabled={walletLoading || loading}
+                    >
+                      {walletLoading ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          Connecting wallet...
+                        </>
+                      ) : (
+                        <>
+                          <Wallet className="size-4" />
+                          {walletConnected ? "Reconnect Freighter" : "Connect Freighter"}
+                        </>
+                      )}
+                    </Button>
+                    {walletConnected ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onDisconnectWallet}
+                        disabled={walletLoading || loading}
+                      >
+                        Disconnect
+                      </Button>
+                    ) : null}
+                  </div>
+                  {walletError ? (
+                    <p className="text-xs text-destructive">{walletError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {walletConnected
+                        ? "Wallet connected. Your public key was imported from Freighter."
+                        : "Connect your Freighter wallet to load your public key."}
+                    </p>
+                  )}
                   <Textarea
                     value={publicKey}
-                    onChange={(event) => setPublicKey(event.target.value)}
-                    placeholder="G..."
+                    readOnly
+                    placeholder="Connect Freighter wallet to load your public key."
                     className="min-h-28 bg-background font-mono text-xs sm:text-sm"
                     required
                   />
@@ -250,7 +332,7 @@ export default function Home() {
                     type="submit"
                     size="lg"
                     className="w-full"
-                    disabled={loading || !publicKey.trim()}
+                    disabled={loading || walletLoading || !publicKey.trim()}
                   >
                     {loading ? (
                       <>
