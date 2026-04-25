@@ -192,10 +192,21 @@ export default function Home() {
     let active = true;
 
     void (async () => {
-      const walletAddress = await getFreighterAddressIfAllowed();
-      if (active && walletAddress) {
-        setPublicKey(walletAddress);
-        void refreshWalletBalance(walletAddress);
+      try {
+        const userDisconnected = typeof window !== "undefined" &&
+          window.localStorage.getItem("walletDisconnectedByUser") === "1";
+
+        if (userDisconnected) {
+          return;
+        }
+
+        const walletAddress = await getFreighterAddressIfAllowed();
+        if (active && walletAddress) {
+          setPublicKey(walletAddress);
+          void refreshWalletBalance(walletAddress);
+        }
+      } catch {
+        // ignore errors from checking localStorage or freighter
       }
     })();
 
@@ -215,6 +226,11 @@ export default function Home() {
       return;
     }
 
+    // Clear the disconnect flag so future page loads may auto-reconnect
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("walletDisconnectedByUser");
+    }
+
     setPublicKey(walletResult.address);
     setWalletBalance(null);
     void refreshWalletBalance(walletResult.address);
@@ -222,6 +238,11 @@ export default function Home() {
   }
 
   function onDisconnectWallet() {
+    // Remember that the user explicitly disconnected so we don't auto-reconnect on reload
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("walletDisconnectedByUser", "1");
+    }
+
     walletBalanceRequestId.current += 1;
     setPublicKey("");
     setWalletError(null);
