@@ -1,6 +1,6 @@
 "use client";
 
-import { type SubmitEvent, useEffect, useState } from "react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   CheckCircle2,
@@ -49,9 +49,29 @@ type RequestResult = {
   code?: RequestXlmErrorCode;
 };
 
+type WalletBalanceResponse = {
+  success?: boolean;
+  balance?: string;
+  error?: string;
+};
+
 async function fetchStatus(): Promise<FaucetStatus> {
   const response = await fetch("/api/status", { cache: "no-store" });
   return (await response.json()) as FaucetStatus;
+}
+
+async function fetchWalletBalance(publicKey: string): Promise<string> {
+  const response = await fetch(
+    `/api/account-balance?publicKey=${encodeURIComponent(publicKey)}`,
+    { cache: "no-store" },
+  );
+  const data = (await response.json()) as WalletBalanceResponse;
+
+  if (!response.ok || !data.success || !data.balance) {
+    throw new Error(data.error ?? "Unable to fetch wallet balance.");
+  }
+
+  return data.balance;
 }
 
 function getFallbackRequestErrorCode(status: number): RequestXlmErrorCode {
@@ -92,10 +112,51 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<string | null>(null);
+  const [walletBalanceLoading, setWalletBalanceLoading] = useState(false);
+  const [walletBalanceError, setWalletBalanceError] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [result, setResult] = useState<RequestResult | null>(null);
   const [status, setStatus] = useState<FaucetStatus | null>(null);
+  const walletBalanceRequestId = useRef(0);
   const walletConnected = Boolean(publicKey.trim());
+  const walletBalanceDisplay = !walletConnected
+    ? "—"
+    : walletBalanceLoading
+      ? "..."
+      : walletBalance ?? "Unavailable";
+  const walletBalanceHint = !walletConnected
+    ? "Connect your wallet to view live XLM balance."
+    : walletBalanceLoading
+      ? "Refreshing account balance from Stellar testnet..."
+      : walletBalance
+        ? "Live account balance"
+        : "Balance unavailable";
+
+  async function refreshWalletBalance(address: string) {
+    const requestId = walletBalanceRequestId.current + 1;
+    walletBalanceRequestId.current = requestId;
+    setWalletBalanceLoading(true);
+    setWalletBalanceError(null);
+
+    try {
+      const balance = await fetchWalletBalance(address);
+      if (walletBalanceRequestId.current === requestId) {
+        setWalletBalance(balance);
+      }
+    } catch (error) {
+      if (walletBalanceRequestId.current === requestId) {
+        setWalletBalance(null);
+        setWalletBalanceError(
+          error instanceof Error ? error.message : "Unable to fetch wallet balance.",
+        );
+      }
+    } finally {
+      if (walletBalanceRequestId.current === requestId) {
+        setWalletBalanceLoading(false);
+      }
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -134,6 +195,7 @@ export default function Home() {
       const walletAddress = await getFreighterAddressIfAllowed();
       if (active && walletAddress) {
         setPublicKey(walletAddress);
+        void refreshWalletBalance(walletAddress);
       }
     })();
 
@@ -154,12 +216,18 @@ export default function Home() {
     }
 
     setPublicKey(walletResult.address);
+    setWalletBalance(null);
+    void refreshWalletBalance(walletResult.address);
     setWalletLoading(false);
   }
 
   function onDisconnectWallet() {
+    walletBalanceRequestId.current += 1;
     setPublicKey("");
     setWalletError(null);
+    setWalletBalance(null);
+    setWalletBalanceError(null);
+    setWalletBalanceLoading(false);
   }
 
   async function onSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -205,6 +273,7 @@ export default function Home() {
 
       const statusResponse = await fetchStatus();
       setStatus(statusResponse);
+      await refreshWalletBalance(publicKey.trim());
     } catch {
       const errorCode: RequestXlmErrorCode = "REQUEST_UNAVAILABLE";
       setResult({
@@ -279,28 +348,31 @@ export default function Home() {
               <CardContent>
                 <form onSubmit={onSubmit} className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={onConnectWallet}
-                      disabled={walletLoading || loading}
-                    >
-                      {walletLoading ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Connecting wallet...
-                        </>
-                      ) : (
-                        <>
-                          <Wallet className="size-4" />
-                          {walletConnected ? "Reconnect Freighter" : "Connect Freighter"}
-                        </>
-                      )}
-                    </Button>
+                    {!walletConnected ? (
+                      <Button
+                        type="button"
+                        variant="default"
+                        onClick={onConnectWallet}
+                        className="h-10 border border-primary bg-primary px-4 text-white hover:bg-emerald-900"
+                        disabled={walletLoading || loading}
+                      >
+                        {walletLoading ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Connecting wallet...
+                          </>
+                        ) : (
+                          <>
+                            <Wallet className="size-4" />
+                            Connect Freighter
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
                     {walletConnected ? (
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="destructive"
                         onClick={onDisconnectWallet}
                         disabled={walletLoading || loading}
                       >
@@ -317,11 +389,41 @@ export default function Home() {
                         : "Connect your Freighter wallet to load your public key."}
                     </p>
                   )}
+                  <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-linear-to-br from-emerald-500/15 via-background to-background p-4">
+                    <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-emerald-500/20 blur-2xl" />
+                    <div className="relative">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                          Wallet XLM balance
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-500/40 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"
+                        >
+                          {walletConnected ? "Connected" : "Disconnected"}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex items-end gap-2">
+                        <p className="font-mono text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                          {walletBalanceDisplay}
+                        </p>
+                        {walletConnected && !walletBalanceLoading && walletBalance ? (
+                          <span className="pb-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                            XLM
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{walletBalanceHint}</p>
+                      {walletBalanceError && walletConnected ? (
+                        <p className="mt-2 text-xs text-destructive">{walletBalanceError}</p>
+                      ) : null}
+                    </div>
+                  </div>
                   <Textarea
                     value={publicKey}
                     readOnly
                     placeholder="Connect Freighter wallet to load your public key."
-                    className="min-h-28 bg-background font-mono text-xs sm:text-sm"
+                    className="h-max bg-background font-mono text-xs sm:text-sm"
                     required
                   />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -331,7 +433,7 @@ export default function Home() {
                   <Button
                     type="submit"
                     size="lg"
-                    className="w-full"
+                    className="h-11 w-full border border-primary bg-primary font-semibold text-white hover:bg-emerald-900"
                     disabled={loading || walletLoading || !publicKey.trim()}
                   >
                     {loading ? (
@@ -356,7 +458,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 {!result ? (
-                  <Alert variant="warning">
+                  <Alert variant="default">
                     <TriangleAlert className="size-4" />
                     <AlertTitle>No request yet</AlertTitle>
                     <AlertDescription>
@@ -385,11 +487,10 @@ export default function Home() {
                     {result.hash ? (
                       <div className="mt-2 space-y-2 group-has-[>svg]/alert:col-start-2">
                         <div
-                          className={`rounded-md border p-2 font-mono text-xs break-all ${
-                            result.type === "success"
-                              ? "border-emerald-300/60 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-100"
-                              : "border-red-300/60 bg-red-50/70 text-red-900 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-100"
-                          }`}
+                          className={`rounded-md border p-2 font-mono text-xs break-all ${result.type === "success"
+                            ? "border-emerald-300/60 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-100"
+                            : "border-red-300/60 bg-red-50/70 text-red-900 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-100"
+                            }`}
                         >
                           {result.hash}
                         </div>
@@ -397,11 +498,10 @@ export default function Home() {
                           href={`https://stellar.expert/explorer/testnet/tx/${encodeURIComponent(result.hash)}`}
                           target="_blank"
                           rel="noreferrer"
-                          className={`inline-flex items-center gap-1 text-xs font-medium underline underline-offset-4 ${
-                            result.type === "success"
-                              ? "text-emerald-800 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
-                              : "text-red-800 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
-                          }`}
+                          className={`inline-flex items-center gap-1 text-xs font-medium underline underline-offset-4 ${result.type === "success"
+                            ? "text-emerald-800 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
+                            : "text-red-800 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
+                            }`}
                         >
                           View transaction on Stellar Expert
                           <ArrowUpRight className="size-3" />
@@ -428,7 +528,7 @@ export default function Home() {
                     rel="noreferrer"
                   />
                 }
-                className="h-6 gap-1"
+                className="h-7 gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 [a]:hover:bg-emerald-500/20 [a]:hover:text-emerald-800 dark:[a]:hover:text-emerald-200"
               >
                 Docs <ArrowUpRight className="size-3" />
               </Badge>
@@ -441,7 +541,7 @@ export default function Home() {
                     rel="noreferrer"
                   />
                 }
-                className="h-6 gap-1"
+                className="h-7 gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 [a]:hover:bg-emerald-500/20 [a]:hover:text-emerald-800 dark:[a]:hover:text-emerald-200"
               >
                 Explorer <ArrowUpRight className="size-3" />
               </Badge>
@@ -454,7 +554,7 @@ export default function Home() {
                     rel="noreferrer"
                   />
                 }
-                className="h-6 gap-1"
+                className="h-7 gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 [a]:hover:bg-emerald-500/20 [a]:hover:text-emerald-800 dark:[a]:hover:text-emerald-200"
               >
                 Horizon <ArrowUpRight className="size-3" />
               </Badge>
