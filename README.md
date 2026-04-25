@@ -1,4 +1,5 @@
 # Stellar Testnet Faucet
+<img width="1470" height="795" alt="Screenshot 2026-04-25 at 17 14 21" src="https://github.com/user-attachments/assets/c9ec19dc-3cb1-4445-ad15-7c415c65e112" />
 
 A modern, dark-themed faucet for sending test XLM on Stellar testnet.  
 Built with Next.js App Router, shadcn/ui, Stellar SDK, and MongoDB-backed rate limiting.
