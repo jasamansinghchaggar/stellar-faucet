@@ -24,6 +24,11 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  REQUEST_XLM_USER_MESSAGES,
+  isRequestXlmErrorCode,
+  type RequestXlmErrorCode,
+} from "@/lib/requestXlmErrors";
 
 type FaucetStatus = {
   operational: boolean;
@@ -36,11 +41,45 @@ type RequestResult = {
   type: "success" | "error";
   message: string;
   hash?: string;
+  code?: RequestXlmErrorCode;
 };
 
 async function fetchStatus(): Promise<FaucetStatus> {
   const response = await fetch("/api/status", { cache: "no-store" });
   return (await response.json()) as FaucetStatus;
+}
+
+function getFallbackRequestErrorCode(status: number): RequestXlmErrorCode {
+  if (status === 429) {
+    return "RATE_LIMITED";
+  }
+
+  if (status === 422) {
+    return "TRANSACTION_REJECTED";
+  }
+
+  if (status === 503) {
+    return "HORIZON_UNAVAILABLE";
+  }
+
+  if (status === 400) {
+    return "INVALID_JSON";
+  }
+
+  return "INTERNAL_ERROR";
+}
+
+function getUserFacingRequestMessage(
+  code: RequestXlmErrorCode,
+  nextAvailableAt?: string | null,
+) {
+  if (code === "RATE_LIMITED" && nextAvailableAt) {
+    return `${REQUEST_XLM_USER_MESSAGES[code]} Try again after ${new Date(
+      nextAvailableAt,
+    ).toLocaleString()}.`;
+  }
+
+  return REQUEST_XLM_USER_MESSAGES[code];
 }
 
 export default function Home() {
@@ -99,16 +138,18 @@ export default function Home() {
         hash?: string;
         amount?: string;
         error?: string;
+        errorCode?: string;
         nextAvailableAt?: string | null;
       };
 
       if (!response.ok || !data.success) {
-        const retryText = data.nextAvailableAt
-          ? ` Next eligible request: ${new Date(data.nextAvailableAt).toLocaleString()}.`
-          : "";
+        const errorCode = isRequestXlmErrorCode(data.errorCode)
+          ? data.errorCode
+          : getFallbackRequestErrorCode(response.status);
         setResult({
           type: "error",
-          message: `${data.error ?? "Request failed."}${retryText}`,
+          code: errorCode,
+          message: getUserFacingRequestMessage(errorCode, data.nextAvailableAt),
         });
         return;
       }
@@ -122,9 +163,11 @@ export default function Home() {
       const statusResponse = await fetchStatus();
       setStatus(statusResponse);
     } catch {
+      const errorCode: RequestXlmErrorCode = "REQUEST_UNAVAILABLE";
       setResult({
         type: "error",
-        message: "Unable to send request. Please try again.",
+        code: errorCode,
+        message: REQUEST_XLM_USER_MESSAGES[errorCode],
       });
     } finally {
       setLoading(false);
@@ -231,7 +274,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 {!result ? (
-                  <Alert>
+                  <Alert variant="warning">
                     <TriangleAlert className="size-4" />
                     <AlertTitle>No request yet</AlertTitle>
                     <AlertDescription>
@@ -239,7 +282,15 @@ export default function Home() {
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <Alert variant={result.type === "success" ? "default" : "destructive"}>
+                  <Alert
+                    variant={
+                      result.type === "success"
+                        ? "success"
+                        : result.code === "RATE_LIMITED"
+                          ? "warning"
+                          : "destructive"
+                    }
+                  >
                     {result.type === "success" ? (
                       <CheckCircle2 className="size-4" />
                     ) : (
@@ -250,8 +301,29 @@ export default function Home() {
                     </AlertTitle>
                     <AlertDescription>{result.message}</AlertDescription>
                     {result.hash ? (
-                      <div className="mt-2 rounded-md border border-border bg-background p-2 font-mono text-xs break-all">
-                        {result.hash}
+                      <div className="mt-2 space-y-2 group-has-[>svg]/alert:col-start-2">
+                        <div
+                          className={`rounded-md border p-2 font-mono text-xs break-all ${
+                            result.type === "success"
+                              ? "border-emerald-300/60 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-100"
+                              : "border-red-300/60 bg-red-50/70 text-red-900 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-100"
+                          }`}
+                        >
+                          {result.hash}
+                        </div>
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/tx/${encodeURIComponent(result.hash)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`inline-flex items-center gap-1 text-xs font-medium underline underline-offset-4 ${
+                            result.type === "success"
+                              ? "text-emerald-800 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
+                              : "text-red-800 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
+                          }`}
+                        >
+                          View transaction on Stellar Expert
+                          <ArrowUpRight className="size-3" />
+                        </a>
                       </div>
                     ) : null}
                   </Alert>

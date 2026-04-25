@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  REQUEST_XLM_USER_MESSAGES,
+  type RequestXlmErrorCode,
+} from "@/lib/requestXlmErrors";
 import { getRateLimitInfo, isRateLimited } from "@/lib/rateLimit";
 import { isValidPublicKey, sendXLM } from "@/lib/stellar";
 
@@ -31,36 +35,102 @@ function getFaucetAmount() {
   return amount;
 }
 
+function buildErrorResponse(
+  code: RequestXlmErrorCode,
+  status: number,
+  extra: Record<string, unknown> = {},
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      errorCode: code,
+      error: REQUEST_XLM_USER_MESSAGES[code],
+      ...extra,
+    },
+    { status },
+  );
+}
+
+function hasStellarResultCodes(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const response = (error as { response?: unknown }).response;
+  if (!response || typeof response !== "object") {
+    return false;
+  }
+
+  const data = (response as { data?: unknown }).data;
+  if (!data || typeof data !== "object") {
+    return false;
+  }
+
+  const extras = (data as { extras?: unknown }).extras;
+  if (!extras || typeof extras !== "object") {
+    return false;
+  }
+
+  const resultCodes = (extras as { result_codes?: unknown }).result_codes;
+  return Boolean(resultCodes && typeof resultCodes === "object");
+}
+
+function classifyServerError(error: unknown): {
+  code: RequestXlmErrorCode;
+  status: number;
+} {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+
+  if (
+    message.includes("faucet_secret_key") ||
+    message.includes("rate_limit_hours") ||
+    message.includes("faucet_amount_xlm")
+  ) {
+    return { code: "FAUCET_CONFIGURATION_ERROR", status: 500 };
+  }
+
+  if (
+    message.includes("horizon") ||
+    message.includes("network") ||
+    message.includes("fetch failed") ||
+    message.includes("timeout") ||
+    message.includes("econn")
+  ) {
+    return { code: "HORIZON_UNAVAILABLE", status: 503 };
+  }
+
+  if (
+    hasStellarResultCodes(error) ||
+    message.includes("op_") ||
+    message.includes("tx_") ||
+    message.includes("destination") ||
+    message.includes("sequence") ||
+    message.includes("insufficient")
+  ) {
+    return { code: "TRANSACTION_REJECTED", status: 422 };
+  }
+
+  return { code: "INTERNAL_ERROR", status: 500 };
+}
+
 export async function POST(request: Request) {
   let payload: RequestPayload;
 
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json(
-      { error: "Request body must be valid JSON" },
-      { status: 400 },
-    );
+    return buildErrorResponse("INVALID_JSON", 400);
   }
 
   const publicKey =
     typeof payload.publicKey === "string" ? payload.publicKey.trim() : "";
 
   if (!publicKey) {
-    return NextResponse.json(
-      { error: "publicKey is required in the request body" },
-      { status: 400 },
-    );
+    return buildErrorResponse("MISSING_PUBLIC_KEY", 400);
   }
 
   if (!isValidPublicKey(publicKey)) {
-    return NextResponse.json(
-      {
-        error:
-          "Invalid Stellar public key. It must be 56 characters and start with G.",
-      },
-      { status: 400 },
-    );
+    return buildErrorResponse("INVALID_PUBLIC_KEY", 400);
   }
 
   try {
@@ -69,14 +139,10 @@ export async function POST(request: Request) {
 
     if (limited) {
       const info = await getRateLimitInfo(publicKey, rateLimitHours);
-      return NextResponse.json(
-        {
-          error: "Rate limit exceeded. Please try again later.",
-          nextAvailableAt: info.nextAvailableAt?.toISOString() ?? null,
-          retryAfterSeconds: Math.ceil(info.retryAfterMs / 1000),
-        },
-        { status: 429 },
-      );
+      return buildErrorResponse("RATE_LIMITED", 429, {
+        nextAvailableAt: info.nextAvailableAt?.toISOString() ?? null,
+        retryAfterSeconds: Math.ceil(info.retryAfterMs / 1000),
+      });
     }
 
     const amount = getFaucetAmount();
@@ -92,9 +158,7 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unexpected server error";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    const { code, status } = classifyServerError(error);
+    return buildErrorResponse(code, status);
   }
 }
